@@ -1,0 +1,25 @@
+name: happynation_mobile
+description: "A new Flutter project for Employee Well-Being AI Evaluation."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=2.18.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  get: ^4.6.5
+  http: ^0.13.5
+  flutter_secure_storage: ^6.0.0
+  google_fonts: ^3.0.1
+  fl_chart: ^0.55.2
+  cupertino_icons: ^1.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true

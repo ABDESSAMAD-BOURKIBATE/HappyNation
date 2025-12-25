@@ -1,0 +1,5 @@
+{
+  "name": "Happynation",
+  "description": "An AI-powered employee well-being evaluation application that analyzes survey responses to provide personalized stress, focus, and wellness insights.",
+  "requestFramePermissions": []
+}
