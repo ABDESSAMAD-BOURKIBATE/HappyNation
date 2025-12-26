@@ -15,18 +15,18 @@ import { getEmployees, createEmployee, loginEmployee, saveAssessmentResult, getE
 
 // Mock Data
 const INITIAL_QUESTIONS = [
-    { id: 1, text: "How often do you feel emotionally drained from your work?" },
-    { id: 2, text: "Do you feel worn out at the end of the working day?" },
-    { id: 3, text: "How often do you feel under pressure to meet deadlines?" },
-    { id: 4, text: "I feel inspired to do my best work every day." },
-    { id: 5, text: "I am enthusiastic about my job." },
-    { id: 6, text: "Time flies when I'm working." },
-    { id: 7, text: "I feel my contributions are recognized and valued." },
-    { id: 8, text: "My work gives me a sense of personal accomplishment." },
-    { id: 9, text: "I have the autonomy to decide how I do my work." },
-    { id: 10, text: "I am able to disconnect from work during my personal time." },
-    { id: 11, text: "I feel supported by my manager when I face challenges." },
-    { id: 12, text: "I understand how my work contributes to the company's goals." },
+    { id: 1, text: "How often do you feel emotionally drained from your work?", category: "Psychological Well-being" },
+    { id: 2, text: "Do you feel worn out at the end of the working day?", category: "Physical Health" },
+    { id: 3, text: "How often do you feel under pressure to meet deadlines?", category: "Workload & Stress" },
+    { id: 4, text: "I feel inspired to do my best work every day.", category: "Psychological Well-being" },
+    { id: 5, text: "I am enthusiastic about my job.", category: "Psychological Well-being" },
+    { id: 6, text: "Time flies when I'm working.", category: "Work Environment" },
+    { id: 7, text: "I feel my contributions are recognized and valued.", category: "Social Dynamics" },
+    { id: 8, text: "My work gives me a sense of personal accomplishment.", category: "Psychological Well-being" },
+    { id: 9, text: "I have the autonomy to decide how I do my work.", category: "Work Environment" },
+    { id: 10, text: "I am able to disconnect from work during my personal time.", category: "Workload & Stress" },
+    { id: 11, text: "I feel supported by my manager when I face challenges.", category: "Social Dynamics" },
+    { id: 12, text: "I understand how my work contributes to the company's goals.", category: "Work Environment" },
 ];
 
 export default function App() {
@@ -77,15 +77,29 @@ export default function App() {
             getEmployeeHistory((userProfile as any).id).then(h => setHistory(h));
         }
 
+        // Auto-Redirect/Reference Check (Persistence)
+        const savedAdmin = localStorage.getItem('happynation_admin');
+        const path = window.location.pathname;
+
+        // If at Login/Root pages but have session, redirect to dashboard
+        if (path === '/' || path === '/role-selection' || path === '/hr-login') {
+            if (savedAdmin) {
+                navigate('/hr-dashboard');
+            } else if (userProfile && (userProfile as any).id) {
+                // If userProfile is already loaded from local storage (state init)
+                navigate('/employee-survey');
+            }
+        }
+
     }, []);
 
     const [history, setHistory] = useState<any[]>([]);
     const [result, setResult] = useState<any>(null);
 
     // Helpers
-    const handleAddQuestion = (text: string) => {
+    const handleAddQuestion = (text: string, category: string) => {
         const newId = Math.max(...questions.map(q => q.id), 0) + 1;
-        setQuestions([...questions, { id: newId, text }]);
+        setQuestions([...questions, { id: newId, text, category }]);
     };
 
     const handleDeleteQuestion = (id: number) => {
@@ -98,9 +112,9 @@ export default function App() {
         await createEmployee(newEmp);
     };
 
-    const handleUpdateEmployee = async (emp: EmployeeWithAuth) => {
-        setEmployees(employees.map(e => e.id === emp.id ? emp : e));
-        await updateEmployee(emp);
+    const handleUpdateEmployee = async (emp: EmployeeWithAuth, oldId?: string) => {
+        setEmployees(employees.map(e => e.id === (oldId || emp.id) ? emp : e));
+        await updateEmployee(emp, oldId);
     };
 
     const handleDeleteEmployee = async (id: string) => {
@@ -132,7 +146,7 @@ export default function App() {
     const handleHrLogin = async (email: string, password: string) => {
         const admin = await loginAdmin(email, password);
         if (admin) {
-            // We could also persist admin session here if needed, but for now focusing on employee
+            localStorage.setItem('happynation_admin', JSON.stringify(admin));
             navigate('/hr-dashboard');
             return true;
         }
@@ -164,9 +178,17 @@ export default function App() {
 
             // Save result to Firestore
             if ('id' in userProfile) {
+                const empId = (userProfile as any).id;
                 // Cast because we know it's an EmployeeWithAuth if logged in
-                await saveAssessmentResult((userProfile as any).id, resultData);
+                await saveAssessmentResult(empId, resultData);
                 setHistory(prev => [...prev, resultData]);
+
+                // Sync with local employees state for HR Dashboard
+                setEmployees(prev => prev.map(emp =>
+                    emp.id === empId
+                        ? { ...emp, lastAssessment: { score: resultData.score, risk: resultData.risk, date: resultData.date } }
+                        : emp
+                ));
             }
 
             navigate('/employee-result');
@@ -231,6 +253,10 @@ export default function App() {
     // --- Theme Wrapper ---
     const bgClass = isDarkMode ? 'bg-[#020617] text-white' : 'bg-slate-50 text-slate-900';
 
+    const handleToggleQuestion = (id: number) => {
+        setQuestions(prev => prev.map(q => q.id === id ? { ...q, isHidden: !q.isHidden } : q));
+    };
+
     return (
         <div className={`min-h-screen transition-colors duration-500 ${bgClass} overflow-x-hidden relative font-sans`}>
             {/* Draggable Theme Toggle Button */}
@@ -290,6 +316,7 @@ export default function App() {
                         questions={questions}
                         onAddQuestion={handleAddQuestion}
                         onDeleteQuestion={handleDeleteQuestion}
+                        onToggleQuestion={handleToggleQuestion}
                         employees={employees}
                         onAddEmployee={handleAddEmployee}
                         onUpdateEmployee={handleUpdateEmployee}

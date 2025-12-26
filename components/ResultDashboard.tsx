@@ -58,8 +58,8 @@ const ResultDashboard: React.FC<ResultDashboardProps> = ({ result, user, onLogou
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 flex flex-col items-center justify-center pt-4">
-            <span className={`text-2xl font-bold ${color}`}>{value}%</span>
-            <span className="text-xs text-gray-400">Score</span>
+          <span className={`text-2xl font-bold ${color}`}>{value}%</span>
+          <span className="text-xs text-gray-400">Score</span>
         </div>
       </div>
       <div className={`px-3 py-1 rounded-full text-xs font-bold mt-[-20px] ${value > 66 ? 'bg-blue-100 text-blue-700' : value > 33 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
@@ -91,10 +91,10 @@ const ResultDashboard: React.FC<ResultDashboardProps> = ({ result, user, onLogou
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-start gap-4">
             <div className={`p-3 rounded-xl ${getRiskColor(result.riskLevel)} bg-opacity-20`}>
-               <AlertTriangle className={result.riskLevel === 'High' ? 'text-red-600' : 'text-yellow-600'} />
+              <AlertTriangle className={result.riskLevel === 'High' ? 'text-red-600' : 'text-yellow-600'} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">Analysis Completed</h2>
+              <h2 className="text-lg font-bold text-gray-900">Analysis Completed for {user.name}</h2>
               <p className="text-gray-600 max-w-xl text-sm mt-1">{result.summary}</p>
             </div>
           </div>
@@ -148,11 +148,11 @@ const ResultDashboard: React.FC<ResultDashboardProps> = ({ result, user, onLogou
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={progressData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9ca3af'}} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9ca3af'}} />
-                  <Tooltip 
-                    cursor={{fill: '#f9fafb'}}
-                    contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'}}
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9ca3af' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9ca3af' }} />
+                  <Tooltip
+                    cursor={{ fill: '#f9fafb' }}
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
                   />
                   <Bar dataKey="score" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={20} />
                 </BarChart>

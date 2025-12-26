@@ -13,8 +13,8 @@ export interface User {
 export interface Question {
   id: number;
   text: string;
-  category: 'stress' | 'focus' | 'satisfaction';
-  options: string[];
+  category: string;
+  isHidden?: boolean;
 }
 
 export interface AnalysisResult {
@@ -46,5 +46,17 @@ export interface EmployeeWithAuth extends UserProfile {
     score: number | string;
     risk: 'High' | 'Medium' | 'Low';
     date: string;
+    metrics?: {
+      stress: number;
+      satisfaction: number;
+      focus: number;
+    };
+  };
+  surveyConfig?: {
+    frequency: 'daily' | 'weekly' | 'monthly';
+    questionCount: number;
+    questionTypes: string[]; // e.g., ['psychological', 'environmental', 'time']
+    isSurveyVisible?: boolean;
+    scheduledDate?: string;
   };
 }

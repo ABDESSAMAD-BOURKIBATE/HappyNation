@@ -17,7 +17,7 @@ export const RoleSelection = ({ isDarkMode }: { isDarkMode: boolean }) => {
                     <div className="relative group">
                         <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full blur opacity-25 group-hover:opacity-75 transition duration-1000 group-hover:duration-200"></div>
                         <div className={`relative w-24 h-24 md:w-40 md:h-40 rounded-full border-4 flex items-center justify-center shadow-2xl overflow-hidden ${isDarkMode ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-100'} `}>
-                            <img src="/logo.png" alt="Happynation Logo" className="w-full h-full object-cover transform hover:scale-110 transition-transform duration-500" />
+                            <img src={`${import.meta.env.BASE_URL || '/'}logo.png`} alt="Happynation Logo" className="w-full h-full object-cover transform scale-110 hover:scale-125 transition-transform duration-500" />
                         </div>
                     </div>
 

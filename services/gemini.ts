@@ -20,9 +20,14 @@ export const analyzeWellBeing = async (questions: any[], answers: Record<number,
 
     Analyze the following employee survey responses based on the "Maslach Burnout Inventory" and "Job Satisfaction" principles.
     Context: 1=Strongly Disagree/Never, 5=Strongly Agree/Always.
+    
+    IMPORTANT SCORING RULES:
+    - Questions about "drained", "worn out", "pressure" (IDs 1, 2, 3) are NEGATIVE. High score (5) = BAD (High Stress).
+    - Other questions are POSITIVE. High score (5) = GOOD (High Well-being).
+    - When calculating the overall "score", you MUST inverse the values for the negative questions.
 
     Questions & Answers:
-    ${questions.map(q => `- "${q.text}": ${answers[q.id] || 0}`).join('\n')}
+    ${questions.map(q => `- [ID: ${q.id}] "${q.text}": ${answers[q.id] || 0}`).join('\n')}
 
     Output MUST be valid JSON with this schema:
     {
@@ -61,10 +66,26 @@ export const analyzeWellBeing = async (questions: any[], answers: Record<number,
         // Simulation Mode (Offline/Fallback)
         console.log("Using Simulation Mode for Analysis");
 
-        // Calculate raw scores from answers (1-5 scale)
-        const totalScore = Object.values(answers).reduce((a, b) => a + b, 0);
-        const maxScore = questions.length * 5;
-        const normalizedScore = Math.round((totalScore / maxScore) * 100);
+        // Calculate raw scores with Polarity Correction
+        // IDs 1, 2, 3 are Negative (Burnout indicators). 4-12 are Positive.
+        const negativeIds = [1, 2, 3];
+        let totalScore = 0;
+        let maxPossibleScore = 0;
+
+        Object.entries(answers).forEach(([qId, score]) => {
+            const id = parseInt(qId);
+            maxPossibleScore += 5;
+
+            if (negativeIds.includes(id)) {
+                // Inverse for Negative Questions: 5 becomes 1, 1 becomes 5.
+                // Formula: (Max + Min) - Score => (5 + 1) - Score = 6 - Score
+                totalScore += (6 - score);
+            } else {
+                totalScore += score;
+            }
+        });
+
+        const normalizedScore = Math.round((totalScore / maxPossibleScore) * 100);
 
         // Derive metrics deterministically but with variety
         const stressLevel = Math.max(0, 100 - normalizedScore + (Math.random() * 10 - 5));
@@ -76,9 +97,10 @@ export const analyzeWellBeing = async (questions: any[], answers: Record<number,
         let summary: string;
         let recommendations: string[];
 
+        // Adjusted thresholds for risk
         if (normalizedScore > 75) {
             risk = "Low";
-            summary = "Excellent well-being! Your engagement and satisfaction levels are inspiring.";
+            summary = `Excellent well-being! ${profile?.name || 'Employee'}, your engagement and satisfaction levels are inspiring.`;
             recommendations = [
                 "Share your positive strategies with the team",
                 "Maintain your work-life boundaries",
@@ -86,7 +108,7 @@ export const analyzeWellBeing = async (questions: any[], answers: Record<number,
             ];
         } else if (normalizedScore > 45) {
             risk = "Medium";
-            summary = "You're doing okay, but there are signs of emerging stress and fatigue.";
+            summary = `You're doing okay ${profile?.name || 'Employee'}, but there are signs of emerging stress and fatigue.`;
             recommendations = [
                 "Take regular micro-breaks tailored to your rhythm",
                 "Discuss workload distribution with your manager",
@@ -94,7 +116,7 @@ export const analyzeWellBeing = async (questions: any[], answers: Record<number,
             ];
         } else {
             risk = "High";
-            summary = "Critical Alert: Your responses indicate high burnout risk and exhaustion.";
+            summary = `Critical Alert: ${profile?.name || 'Employee'}, your responses indicate high burnout risk and exhaustion.`;
             recommendations = [
                 "Immediate consultation with HR recommended",
                 "Disconnect completely from work this weekend",

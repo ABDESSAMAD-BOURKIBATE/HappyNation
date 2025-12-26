@@ -7,7 +7,7 @@ import { uploadToCloudinary, generateComprehensivePDF } from '../services/utils'
 import { subscribeToEmployeeFeedback, deleteEmployeeFeedback, getEmployeeHistory } from '../services/db';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
-interface Question { id: number; text: string; }
+interface Question { id: number; text: string; category?: string; }
 
 interface EmployeeSurveyProps {
     isDarkMode: boolean;
@@ -28,8 +28,57 @@ export const EmployeeSurvey = ({ isDarkMode, userProfile, questions, onComplete,
     const [tempProfile, setTempProfile] = useState<UserProfile>({ ...userProfile });
     const [isUploading, setIsUploading] = useState(false);
     const [deleteId, setDeleteId] = useState<string | null>(null);
+    const [expandedMsgId, setExpandedMsgId] = useState<string | null>(null);
     const [showHistory, setShowHistory] = useState(false);
     const [historyData, setHistoryData] = useState<any[]>([]);
+
+    // Filter questions based on Survey Configuration
+    const activeQuestions = React.useMemo(() => {
+        if (userProfile && 'surveyConfig' in userProfile && (userProfile as any).surveyConfig) {
+            const config = (userProfile as any).surveyConfig;
+            let filtered = questions;
+
+            // Filter by types if specified and not empty
+            if (config.questionTypes && config.questionTypes.length > 0) {
+                const typeFiltered = questions.filter(q =>
+                    // Case-insensitive check or direct match? Let's try direct match first as we controlled inputs
+                    // Adding fallback for safety
+                    config.questionTypes.includes((q as any).category)
+                );
+                // If filter results in questions, use it. Otherwise fallback to all (to avoid empty survey)
+                if (typeFiltered.length > 0) filtered = typeFiltered;
+            }
+
+            // Limit by count
+            if (config.questionCount > 0) {
+                filtered = filtered.slice(0, config.questionCount);
+            }
+            return filtered;
+        }
+        return questions;
+    }, [questions, userProfile]);
+
+    // Check for visibility/schedule
+    const { isSurveyAvailable, nextDate } = React.useMemo(() => {
+        if (userProfile && 'surveyConfig' in userProfile && (userProfile as any).surveyConfig) {
+            const config = (userProfile as any).surveyConfig;
+
+            // If explicitly visible (or undefined/migrating), it's available
+            if (config.isSurveyVisible !== false) return { isSurveyAvailable: true, nextDate: null };
+
+            // If hidden but has a schedule
+            if (config.scheduledDate) {
+                const schedule = new Date(config.scheduledDate);
+                const now = new Date();
+                if (now >= schedule) return { isSurveyAvailable: true, nextDate: null };
+                return { isSurveyAvailable: false, nextDate: schedule };
+            }
+
+            // Hidden with no schedule
+            return { isSurveyAvailable: false, nextDate: null };
+        }
+        return { isSurveyAvailable: true, nextDate: null };
+    }, [userProfile]);
 
     const fetchHistory = async () => {
         if (userProfile && 'id' in userProfile) {
@@ -57,15 +106,24 @@ export const EmployeeSurvey = ({ isDarkMode, userProfile, questions, onComplete,
         }
     }, [userProfile]);
 
+
+
     const textMuted = isDarkMode ? 'text-slate-400' : 'text-slate-500';
     const headingGradient = isDarkMode
         ? 'bg-gradient-to-br from-white via-slate-200 to-slate-500'
         : 'bg-gradient-to-br from-slate-900 via-slate-700 to-slate-500';
 
+    const [currentTime, setCurrentTime] = useState(new Date());
+
+    React.useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, []);
+
     const handleAnswer = (score: number) => {
-        const newAnswers = { ...answers, [questions[currentQ].id]: score };
+        const newAnswers = { ...answers, [activeQuestions[currentQ].id]: score };
         setAnswers(newAnswers);
-        if (currentQ < questions.length - 1) {
+        if (currentQ < activeQuestions.length - 1) {
             setCurrentQ(p => p + 1);
         } else {
             onComplete(newAnswers);
@@ -111,7 +169,7 @@ export const EmployeeSurvey = ({ isDarkMode, userProfile, questions, onComplete,
             <div className="flex-1 flex flex-col items-center justify-center mt-4">
                 <div className="max-w-xl w-full relative z-10 px-6">
                     {/* Skip Button */}
-                    {historyData.length > 0 && onViewHistoryResult && (
+                    {isSurveyAvailable && historyData.length > 0 && onViewHistoryResult && (
                         <div className="flex justify-center mb-6 animate-in fade-in slide-in-from-top-4 duration-500">
                             <button
                                 onClick={() => onViewHistoryResult(historyData[historyData.length - 1])}
@@ -125,33 +183,88 @@ export const EmployeeSurvey = ({ isDarkMode, userProfile, questions, onComplete,
                         </div>
                     )}
 
-                    <div className={`flex justify-center mb-8 font-medium text-sm ${textMuted} `}>
-                        <span className={`px-4 py-2 rounded-full border ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-slate-100 border-slate-200'} `}>Question {currentQ + 1} of {questions.length}</span>
-                    </div>
+                    {!isSurveyAvailable ? (
+                        <div className="text-center animate-in fade-in zoom-in duration-500">
+                            <div className={`relative w-48 h-48 mx-auto mb-8 rounded-full flex items-center justify-center border-4 ${isDarkMode ? 'border-slate-800 bg-slate-900' : 'border-white bg-slate-50 shadow-xl'}`}>
+                                <div className="absolute inset-0 rounded-full border-4 border-t-blue-500 border-r-transparent border-b-purple-500 border-l-transparent animate-spin-slow opacity-50"></div>
+                                <div className="text-center">
+                                    <h3 className={`text-4xl font-black mb-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                                        {nextDate ? (
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-sm font-bold opacity-50 uppercase tracking-widest mb-2">Next Survey</span>
+                                                <span className="tabular-nums tracking-tighter bg-clip-text text-transparent bg-gradient-to-br from-blue-400 to-purple-400 text-3xl md:text-4xl">
+                                                    {(() => {
+                                                        const diff = new Date(nextDate).getTime() - currentTime.getTime();
+                                                        if (diff <= 0) return 'READY';
 
-                    <div className="relative mb-16">
-                        <h2 className={`text-3xl md:text-5xl font-black leading-tight text-center bg-clip-text text-transparent ${headingGradient} drop-shadow-sm`}>
-                            {questions[currentQ].text}
-                        </h2>
-                    </div>
+                                                        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                                                        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                                                        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                                                        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
-                    <div className="grid gap-4">
-                        {[1, 2, 3, 4, 5].map((score) => (
-                            <SurveyOption
-                                key={score}
-                                score={score}
-                                isDark={isDarkMode}
-                                label={score === 1 ? "Never" : score === 2 ? "Rarely" : score === 3 ? "Sometimes" : score === 4 ? "Often" : "Always"}
-                                onClick={handleAnswer}
-                            />
-                        ))}
-                    </div>
+                                                        if (days > 0) return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+                                                        return `${hours}h ${minutes}m ${seconds}s`;
+                                                    })()}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-5xl">😴</span>
+                                        )}
+                                    </h3>
+                                </div>
+                            </div>
+                            <h2 className="text-3xl font-black mb-4">You're All Caught Up!</h2>
+                            <p className={`${textMuted} mb-8 max-w-sm mx-auto`}>
+                                {nextDate
+                                    ? `Your next wellness check-in is scheduled for ${nextDate.toLocaleDateString()} at ${nextDate.toLocaleTimeString()}.`
+                                    : "Great job! There are no pending surveys for you right now. Check back later."}
+                            </p>
+                            {historyData.length > 0 && onViewHistoryResult && (
+                                <div className="flex justify-center">
+                                    <Button onClick={() => onViewHistoryResult(historyData[historyData.length - 1])} className="!rounded-full px-8 py-3 !bg-blue-500 hover:!bg-blue-600 shadow-lg shadow-blue-500/20">
+                                        View Last Assessment
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <>
+                            <div className={`flex justify-center mb-8 font-medium text-sm ${textMuted} `}>
+                                <span className={`px-4 py-2 rounded-full border ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-slate-100 border-slate-200'} `}>Question {currentQ + 1} of {activeQuestions.length}</span>
+                            </div>
 
-                    <div className="flex justify-center gap-2 mt-12">
-                        {questions.map((q, i) => (
-                            <div key={q.id} className={`w-2 h-2 rounded-full transition-all duration-300 ${i <= currentQ ? 'bg-blue-500 w-4' : (isDarkMode ? 'bg-slate-800' : 'bg-slate-200')} `} />
-                        ))}
-                    </div>
+                            <div className="relative mb-16">
+                                {activeQuestions[currentQ] && activeQuestions[currentQ].category && (
+                                    <div className="flex justify-center mb-4">
+                                        <span className={`text-[10px] md:text-xs uppercase font-bold px-3 py-1 rounded-full tracking-widest ${isDarkMode ? 'bg-blue-900/40 text-blue-300 border border-blue-500/30' : 'bg-blue-100/80 text-blue-600 border border-blue-200'}`}>
+                                            {activeQuestions[currentQ].category}
+                                        </span>
+                                    </div>
+                                )}
+                                <h2 className={`text-3xl md:text-5xl font-black leading-tight text-center bg-clip-text text-transparent ${headingGradient} drop-shadow-sm`}>
+                                    {activeQuestions[currentQ]?.text || "Loading..."}
+                                </h2>
+                            </div>
+
+                            <div className="grid gap-4">
+                                {[1, 2, 3, 4, 5].map((score) => (
+                                    <SurveyOption
+                                        key={score}
+                                        score={score}
+                                        isDark={isDarkMode}
+                                        label={score === 1 ? "Never" : score === 2 ? "Rarely" : score === 3 ? "Sometimes" : score === 4 ? "Often" : "Always"}
+                                        onClick={handleAnswer}
+                                    />
+                                ))}
+                            </div>
+
+                            <div className="flex justify-center gap-2 mt-12">
+                                {questions.map((q, i) => (
+                                    <div key={q.id} className={`w-2 h-2 rounded-full transition-all duration-300 ${i <= currentQ ? 'bg-blue-500 w-4' : (isDarkMode ? 'bg-slate-800' : 'bg-slate-200')} `} />
+                                ))}
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
             {/* Settings Modal */}
@@ -265,6 +378,8 @@ export const EmployeeSurvey = ({ isDarkMode, userProfile, questions, onComplete,
             )}
 
             {/* History Modal */}
+
+
             {showHistory && (
                 <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowHistory(false)}>
                     <div className={`w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden ${isDarkMode ? 'bg-slate-900' : 'bg-white'}`} onClick={(e) => e.stopPropagation()}>
@@ -351,37 +466,45 @@ export const EmployeeSurvey = ({ isDarkMode, userProfile, questions, onComplete,
                             {feedbackMessages.length > 0 ? (
                                 <div className="divide-y dark:divide-slate-800">
                                     {feedbackMessages.map((msg, idx) => (
-                                        <div key={idx} className={`p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group relative`}>
+                                        <div
+                                            key={idx}
+                                            className={`p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group relative cursor-pointer`}
+                                            onClick={() => setExpandedMsgId(expandedMsgId === msg.id ? null : msg.id)}
+                                        >
                                             <div className="flex justify-between items-start mb-2">
                                                 <p className={`text-xs font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{new Date(msg.date).toLocaleString()}</p>
 
-                                                {deleteId === msg.id ? (
-                                                    <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-200">
-                                                        <span className="text-xs font-bold text-red-500">Confirm?</span>
+                                                <div onClick={(e) => e.stopPropagation()}>
+                                                    {deleteId === msg.id ? (
+                                                        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-200">
+                                                            <span className="text-xs font-bold text-red-500">Confirm?</span>
+                                                            <button
+                                                                onClick={() => { deleteEmployeeFeedback(msg.id); setDeleteId(null); }}
+                                                                className="p-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200"
+                                                            >
+                                                                <Check size={14} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setDeleteId(null)}
+                                                                className={`p-1 rounded-full ${isDarkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'}`}
+                                                            >
+                                                                <X size={14} />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
                                                         <button
-                                                            onClick={() => { deleteEmployeeFeedback(msg.id); setDeleteId(null); }}
-                                                            className="p-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200"
+                                                            onClick={() => setDeleteId(msg.id)}
+                                                            className={`opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded-full hover:bg-red-50 text-red-400 hover:text-red-500 ${isDarkMode ? 'hover:bg-red-900/20' : ''}`}
+                                                            title="Delete Message"
                                                         >
-                                                            <Check size={14} />
+                                                            <Trash2 size={16} />
                                                         </button>
-                                                        <button
-                                                            onClick={() => setDeleteId(null)}
-                                                            className={`p-1 rounded-full ${isDarkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'}`}
-                                                        >
-                                                            <X size={14} />
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => setDeleteId(msg.id)}
-                                                        className={`opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded-full hover:bg-red-50 text-red-400 hover:text-red-500 ${isDarkMode ? 'hover:bg-red-900/20' : ''}`}
-                                                        title="Delete Message"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                )}
+                                                    )}
+                                                </div>
                                             </div>
-                                            <p className="text-sm leading-relaxed pr-8">{msg.message}</p>
+                                            <p className={`text-sm leading-relaxed pr-8 ${expandedMsgId === msg.id ? '' : 'line-clamp-1 text-ellipsis overflow-hidden'}`}>
+                                                {msg.message}
+                                            </p>
                                         </div>
                                     ))}
                                 </div>

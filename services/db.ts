@@ -48,8 +48,12 @@ export const loginEmployee = async (email: string, password?: string): Promise<E
     }
 };
 
-export const updateEmployee = async (employee: EmployeeWithAuth) => {
+export const updateEmployee = async (employee: EmployeeWithAuth, oldId?: string) => {
     try {
+        // If ID changed (email updated), delete old and create new
+        if (oldId && oldId !== employee.id) {
+            await deleteDoc(doc(db, 'employees', oldId));
+        }
         await setDoc(doc(db, 'employees', employee.id), employee);
         return true;
     } catch (error) {
@@ -89,12 +93,18 @@ export const sendFeedback = async (employeeId: string, message: string) => {
 
 export const createAdmin = async (email: string, password: string, name: string) => {
     try {
-        await setDoc(doc(db, 'admins', email), {
-            id: email,
-            name,
-            password, // In real app, hash this!
-            role: 'ADMIN'
-        });
+        const docRef = doc(db, 'admins', email);
+        const docSnap = await getDoc(docRef);
+
+        // Only create if doesn't exist to prevent overwriting images/changes
+        if (!docSnap.exists()) {
+            await setDoc(docRef, {
+                id: email,
+                name,
+                password, // In real app, hash this!
+                role: 'ADMIN'
+            });
+        }
         return true;
     } catch (error) {
         console.error("Error creating admin:", error);
@@ -110,13 +120,37 @@ export const loginAdmin = async (email: string, password: string) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
             if (data.password === password) {
-                return data;
+                return { email, ...data };
             }
         }
         return null;
     } catch (error) {
         console.error("Error logging in admin:", error);
         return null;
+    }
+};
+
+export const getAdmin = async (email: string) => {
+    try {
+        const docRef = doc(db, 'admins', email);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            return { email, ...docSnap.data() };
+        }
+        return null;
+    } catch (error) {
+        console.error("Error getting admin:", error);
+        return null;
+    }
+};
+
+export const updateAdmin = async (email: string, data: any) => {
+    try {
+        await setDoc(doc(db, 'admins', email), data, { merge: true });
+        return true;
+    } catch (error) {
+        console.error("Error updating admin:", error);
+        return false;
     }
 };
 
@@ -226,7 +260,7 @@ export const getEmployeeHistory = async (userId: string) => {
                 const docId = docSnap.id;
                 deletePromises.push(deleteDoc(doc(db, 'assessments', docId)));
             } else {
-                history.push({ id: docSnap.id, ...data });
+                history.push({ id: docSnap.id, date: data.timestamp, ...data });
             }
         });
 
@@ -239,5 +273,15 @@ export const getEmployeeHistory = async (userId: string) => {
     } catch (error) {
         console.error("Error getting history:", error);
         return [];
+    }
+};
+
+export const deleteNotification = async (notificationId: string) => {
+    try {
+        await deleteDoc(doc(db, 'notifications', notificationId));
+        return true;
+    } catch (error) {
+        console.error("Error deleting notification:", error);
+        return false;
     }
 };

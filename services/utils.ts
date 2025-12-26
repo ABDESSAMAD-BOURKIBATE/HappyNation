@@ -307,15 +307,23 @@ export const generateComprehensivePDF = (historyData: any[], userProfile: any, c
                             </tr>
                         </thead>
                         <tbody>
-                             ${filteredHistory.slice(0, 10).map(record => `
+                            ${filteredHistory.slice(0, 10).map(record => {
+        const parseDate = (d: any) => {
+            if (!d) return 'N/A';
+            if (d.seconds) return new Date(d.seconds * 1000).toLocaleDateString();
+            const parsed = new Date(d);
+            return isNaN(parsed.getTime()) ? 'N/A' : parsed.toLocaleDateString();
+        };
+        return `
                                 <tr>
                                     <td style="padding:12px; border-bottom:1px solid #e2e8f0; font-size:14px; color:#475569;">
-                                        ${new Date(record.date).toLocaleDateString()}
+                                        ${parseDate(record.date)}
                                     </td>
                                     <td style="padding:12px; border-bottom:1px solid #e2e8f0; font-weight:600;">${record.score}</td>
                                     <td style="padding:12px; border-bottom:1px solid #e2e8f0; font-size:13px;">${record.risk}</td>
                                 </tr>
-                            `).join('')}
+                            `;
+    }).join('')}
                         </tbody>
                     </table>
                 </div>
